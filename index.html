@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UPI Fraud Detector</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        *{ margin:0; padding:0; box-sizing:border-box; font-family:Roboto; }
+        body{ background:#eef2f7; height:100vh; display:flex; justify-content:center; align-items:center; }
+        .container{ width:900px; display:flex; background:white; border-radius:12px; box-shadow:0 10px 30px rgba(0,0,0,0.1); overflow:hidden; }
+        .left{ background:#1e40af; color:white; padding:40px; width:40%; display:flex; flex-direction:column; justify-content:center; }
+        .left h1{ font-size:28px; margin-bottom:10px; }
+        .left p{ opacity:0.9; }
+        .right{ padding:40px; width:60%; }
+        .form-group{ margin-bottom:18px; }
+        label{ display:block; margin-bottom:6px; color:#475569; font-size:14px; }
+        input,select{ width:100%; padding:12px; border-radius:8px; border:1px solid #d1d5db; }
+        input:focus,select:focus{ outline:none; border-color:#2563eb; }
+        button{ width:100%; padding:13px; background:#2563eb; border:none; border-radius:8px; color:white; font-weight:600; cursor:pointer; margin-top:10px; }
+        button:hover{ background:#1d4ed8; }
+        #result{ margin-top:20px; padding:15px; border-radius:8px; display:none; font-weight:600; text-align:center; transition: all 0.3s; }
+        .safe{ background:#dcfce7; color:#166534; border: 1px solid #166534; }
+        .fraud{ background:#fee2e2; color:#991b1b; border: 1px solid #991b1b; }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <div class="left">
+        <h1>UPI Fraud Detector</h1>
+        <p>AI powered system that analyzes transaction patterns and detects suspicious activity before fraud happens.</p>
+    </div>
+
+    <div class="right">
+        <form id="fraudForm">
+            <div class="form-group">
+                <label>Agent Type </label>
+                <select id="agent_type">
+                    <option value="normal">Normal User</option>
+                    <option value="dormant">Dormant Account</option>
+                    <option value="fraud">Known Fraudulent Agent</option>
+                    <option value="bot">Bot</option>
+                    <option value="impatient">Impatient User</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>UPI App</label>
+                <select id="upi_app">
+                    <option value="GPay">Google Pay</option>
+                    <option value="PhonePe">PhonePe</option>
+                    <option value="Paytm">Paytm</option>
+                    <option value="BHIM">BHIM</option>
+                    <option value="Amazon Pay">Amazon Pay</option>
+                    <option value="PayZapp">PayZapp</option>
+                    <option value="WhatsApp Pay">WhatsApp Pay</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Amount </label>
+                <input type="number" id="amount" value="00.00" step="0.01">
+            </div>
+            <div class="form-group">
+                <label>Bank</label>
+                <select id="bank">
+                    <option value="SBI">SBI</option>
+                    <option value="Axis">Axis</option>
+                    <option value="BOB">BOB</option>
+                    <option value="Kotak">Kotak</option>
+                    <option value="PNB">PNB</option>
+                    <option value="HDFC">HDFC</option>
+                    <option value="ICICI">ICICI</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Hour of Day (0-23)</label>
+                <input type="number" id="hour_of_day" value="0">
+            </div>
+            <div class="form-group">
+                <label>Attempt Count</label>
+                <input type="number" id="attempt_count" value="10">
+            </div>
+            <button type="submit" id="btn">Analyze Transaction</button>
+        </form>
+
+        <div id="result"></div>
+    </div>
+</div>
+
+<script>
+    document.getElementById('fraudForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        
+        const resultDiv = document.getElementById('result');
+        const btn = document.getElementById('btn');
+        
+
+        const amount = parseFloat(document.getElementById('amount').value);
+        const hour = parseInt(document.getElementById('hour_of_day').value);
+
+        const payload = {
+            agent_type: document.getElementById('agent_type').value,
+            amount: amount,
+            upi_app: document.getElementById('upi_app').value,
+            bank: document.getElementById('bank').value,
+            status: "success",
+            amount_slab: amount > 5000 ? "very_large" : "medium",
+            hour_of_day: hour,
+            is_night_transaction: (hour < 6 || hour > 22),
+            is_weekend: false,
+            attempt_count: parseInt(document.getElementById('attempt_count').value)
+        };
+
+        btn.innerText = "Processing...";
+
+        try {
+            const response = await fetch('/predict', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(payload)
+            });
+
+            const data = await response.json();
+            console.log("Server response:", data); // Isse browser console mein check kar sakte hain
+
+            resultDiv.style.display = "block";
+            btn.innerText = "Analyze Transaction";
+
+            // Yahan keys match honi chahiye (data.result aur data.risk_level)
+            if (data.is_suspicious) {
+                resultDiv.className = "fraud";
+                resultDiv.innerHTML = `
+                    <div style="font-size: 1.3rem;">🚨 ${data.result}</div>
+                    <div style="margin-top:5px;"><strong>Risk:</strong> ${data.risk_level}</div>
+                    <div style="font-size: 0.8rem;">Probability: ${data.fraud_probability}%</div>
+                `;
+            } else {
+                resultDiv.className = "safe";
+                resultDiv.innerHTML = `
+                    <div style="font-size: 1.3rem;">✅ ${data.result}</div>
+                    <div style="margin-top:5px;"><strong>Risk:</strong> ${data.risk_level}</div>
+                    <div style="font-size: 0.8rem;">Confidence: ${100 - data.fraud_probability}% safe</div>
+                `;
+            }
+        } catch (error) {
+            btn.innerText = "Analyze Transaction";
+            alert("Error: Flask server check karein!");
+        }
+    });
+</script>
+
+</body>
+</html>
